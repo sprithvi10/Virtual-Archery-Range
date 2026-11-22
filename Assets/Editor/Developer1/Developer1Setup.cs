@@ -276,7 +276,7 @@ namespace VirtualArcheryEditor
             string path = "Assets/UI/PracticeUI.prefab";
             if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
             GameObject root = new GameObject("PracticeUI", typeof(RectTransform), typeof(Canvas),
-                typeof(CanvasScaler), typeof(TrackedDeviceGraphicRaycaster));
+                typeof(CanvasScaler), typeof(TrackedDeviceGraphicRaycaster), typeof(GraphicRaycaster));
             try
             {
                 Canvas canvas = root.GetComponent<Canvas>();

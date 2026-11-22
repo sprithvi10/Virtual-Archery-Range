@@ -4,6 +4,118 @@ For Unity 6000.6.10f1, Universal 3D / URP, and XR Interaction Toolkit 3.6.1.
 Uses two tracked controllers. No eye tracking or gaze input is required.
 Your existing project name, Virtual Archery Range, is fine.
 
+## Integrated Developer 2 game
+
+Open **Assets/Scenes/ArcheryRange.unity** and press **Play**. This is the first enabled
+build scene; the existing sample and Developer 1 test scenes remain available.
+Use the main menu to choose Practice or Competitive.
+
+- **Practice:** three fixed lanes at 6 m, 9 m and 12 m, unlimited arrows, no timer,
+  the original tutorial and immediate feedback. Choose **End Practice** on the
+  right-hand session panel to see final results.
+- **Competitive:** one central target, 60 seconds, 12 arrows, and at least 50 points
+  to win by default. Three consecutive blue-ring-or-better hits (6+ points each)
+  earn the next distance: 6 m, then 9 m, then 12 m. A weak hit or miss resets the
+  current streak; once a distance is earned, a later already-airborne miss cannot revoke it.
+  All airborne arrows must land before the target slides back. Shooting and the timer
+  pause during that slide. A round-ending shot never starts another target move.
+- **Scoring:** gold 10, red 8, blue 6, black 4, white 2. Ground, backstop and flight
+  timeouts are misses. Accuracy is hits divided by resolved shots; no shots means 0%.
+- **Results:** final points, accuracy, targets hit, misses, arrows fired and competitive
+  win/loss, plus the range reached. **Try Again** restarts the same mode;
+  **Return to Menu** resets the session.
+  Ending practice, exhausting arrows or reaching the time limit first disables shooting,
+  then waits for all launched arrows to resolve before displaying the final statistics.
+
+Without a headset, click the Game view: **1** selects Practice, **2** selects Competitive,
+hold **right mouse** to aim, hold/release **Space** to draw/shoot, **E** ends Practice,
+**Esc** returns to the menu, and **R** retries from Results. These keys replace the
+P shortcut in the Developer 1 test scene. The bow is hidden on the desktop preview's
+menu/results screens so it cannot obscure their text; VR bow rendering is unchanged.
+
+**Left-click** the menu, session and results buttons. Mouse movement alone does not aim:
+hold **right mouse** while moving. Keep the Game view focused and floating Editor
+windows out of the way while testing.
+
+The desktop **aim guide** follows the bow's direction, contracts as you draw and turns
+gold at full strength. Its meter shows draw amount, not a predicted impact point:
+arrows still drop. It hides on menus/results, while finishing airborne shots and while
+the target moves, and is disabled in headset play and player builds. It cannot intercept clicks.
+
+The **Cedar Hollow** woodland setting uses shared low-poly trees, layered ridges, warm
+afternoon lighting, a timber shelter, fencing and a framed backstop. Practice has lane
+guides and distance signs; Competitive replaces them with a single precision-course track.
+
+Developer 2 files:
+
+| File | Purpose |
+| --- | --- |
+| Assets/Scripts/Gameplay/GameManager.cs | Menu, mode and results lifecycle; existing Practice integration |
+| Assets/Scripts/Gameplay/Target.cs | Circular five-ring scoring and hit flash through IArrowHitReceiver |
+| Assets/Scripts/Gameplay/ScoreManager.cs | Bow shot tracking, pending shots, points, hits, misses and accuracy |
+| Assets/Scripts/Gameplay/ChallengeManager.cs | Timer, arrow budget, finishing state and win threshold |
+| Assets/Scripts/Gameplay/DifficultyManager.cs | Precision streaks, earned target slides and mode-specific layouts |
+| Assets/Scripts/Gameplay/ResultsManager.cs | Frozen final session statistics |
+| Assets/Scripts/Gameplay/GameUI.cs | Main menu, live scoreboard, draw meter and practice-panel visibility |
+| Assets/Scripts/Gameplay/ResultsUI.cs | Results board, retry and menu controls |
+| Assets/Scripts/Gameplay/DesktopRangeControls.cs | Mode-aware Editor keyboard shortcuts |
+| Assets/Scripts/Gameplay/DesktopAimReticle.cs | Noninteractive Editor-only direction guide and draw feedback |
+| Assets/Editor/Developer2/Developer2Setup.cs | Range/prefab generation and scene validation |
+| Assets/Editor/Developer2/RangePresentationArt.cs | Shared low-poly woodland scenery, mode decoration and lighting |
+| Assets/Prefabs/Target.prefab | Circular solid hit face, scoring rings and stand |
+| Assets/UI/GameUI.prefab, Assets/UI/ResultsUI.prefab | World-space menus, scoreboard and results |
+| Assets/UI/DesktopAimReticle.prefab | Desktop-only overlay sight, draw meter and hint |
+| Assets/Materials/Developer2/ | Range and target materials |
+
+To adjust the rules, select **Range Managers** in ArcheryRange: edit ChallengeManager's
+Round Duration, Arrow Limit and Winning Score, or DifficultyManager's Hits To Advance,
+Minimum Qualifying Points and Transition Duration. The course uses Distances 6/9/12 m
+to match its static signs and track markers. The menu and HUD read the configured rules.
+
+**Archery > Developer 2 > Create Range and Game Assets** creates missing Developer 2
+assets and opens the range. Existing gameplay prefabs are preserved.
+**Upgrade Range Presentation** rebuilds only the generated scenery, reconnects the two
+mode decorations and adds a missing desktop reticle; it also restores the default
+precision-course settings. Save modified scenes when prompted before switching.
+**Validate Current Scene** checks references, circular target colliders, mode decoration,
+noninteractive reticle, both UI input paths and the single VR rig/event system.
+The Developer 1 runtime scripts, prefabs and VRTesting scene are reused rather than replaced.
+
+### Integrated Unity verification
+
+The installed Unity 6000.6.10f1 Editor compiled the updated game and ran a temporary
+Play Mode scenario with real BowController releases and Arrow physics collisions.
+All 42 checkpoints passed: fixed Practice lanes, single-target Competitive, blue-hit
+qualification, weak-hit/miss streak resets, earned 6/9/12 m progression, smooth movement,
+timer/shooting pause, waiting for another airborne arrow, cancel/restart isolation,
+last-arrow completion without another slide, timeout results and reticle state/draw feedback.
+A twelve-shot round produced 98 points, 11 hits, one miss and a win at the 12 m stage.
+No runtime errors or exceptions occurred during that scenario. Practice, Competitive,
+the moving target, expert range and results rendering were inspected after shader warmup.
+Repeating the presentation upgrade and scene validation also passed.
+Native mouse input started Practice and Competitive with the new overlay present;
+right-drag changed camera orientation and a real Space hold/release registered one shot.
+The temporary verification scripts were removed afterward.
+This verifies the Editor preview, not physical headset tracking, controller-ray buttons,
+comfort, or device builds; those still need testing on the intended VR hardware.
+
+### Desktop mouse interaction fix
+
+The original UI only had TrackedDeviceGraphicRaycaster, which accepts XR pointer data
+but ignores ordinary mouse pointers. GameUI, ResultsUI and PracticeUI now also have a
+standard GraphicRaycaster; their asset generators include it too. GameUI and ResultsUI
+disable the mouse raycasters together with their hidden canvases to prevent invisible
+panels intercepting clicks. XRUIInputModule and the tracked-device raycasters remain.
+The teammate's runtime aiming, bow and VR controller code is unchanged.
+
+Verified in the actual Game view with native mouse input: Start Practice, End Practice,
+Try Again, results Return to Menu, Start Competitive and live HUD Return to Menu.
+Right-drag changed the rendered camera rotation by about 38 degrees; a real Space
+hold/release registered one shot. These checks exercise input dispatch, unlike the
+original smoke scenario's direct button-event invocations.
+
+
+
 ## Import and run
 
 1. Extract the ZIP. In Unity, choose **Assets > Import Package > Custom Package**.
