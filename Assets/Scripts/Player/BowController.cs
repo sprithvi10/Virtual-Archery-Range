@@ -19,6 +19,7 @@ namespace VirtualArchery
         public Transform restNock;
         public LineRenderer bowstring;
         public AudioSource releaseAudio;
+        public AudioSource drawAudio;
 
         [Header("Drawing")]
         public float maximumDraw = 0.5f;
@@ -166,7 +167,9 @@ namespace VirtualArchery
         void BeginDraw()
         {
             if (loadedArrow == null || !ShootingEnabled) return;
+
             IsDrawing = true;
+            drawAudio?.Play();
             DrawStarted?.Invoke();
         }
 
@@ -215,6 +218,7 @@ namespace VirtualArchery
 
         public void CancelDraw()
         {
+            drawAudio?.Stop();
             IsDrawing = false;
             SetDrawAmount(0f);
             UpdateVisuals();
