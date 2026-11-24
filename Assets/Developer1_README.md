@@ -60,10 +60,11 @@ menu/results screens so it cannot obscure their text; VR bow rendering is unchan
 hold **right mouse** while moving. Keep the Game view focused and floating Editor
 windows out of the way while testing.
 
-The desktop **aim guide** follows the bow's direction, contracts as you draw and turns
-gold at full strength. Its meter shows draw amount, not a predicted impact point:
-arrows still drop. It hides on menus/results, while finishing airborne shots and while
-the target moves, and is disabled in headset play and player builds. It cannot intercept clicks.
+The desktop **power bar** follows the bow's direction and turns gold at full strength
+in both Practice and Competitive. It shows draw amount, not a predicted impact point;
+there is no crosshair, centre dot or aiming arms. Arrows still drop. The bar hides on
+menus/results, while finishing airborne shots and while the target moves, and is disabled
+in headset play and player builds. It cannot intercept clicks.
 
 The **Cedar Hollow** woodland setting uses shared low-poly trees, layered ridges, warm
 afternoon lighting, a timber shelter, fencing and a framed backstop. Practice has a central
@@ -85,12 +86,12 @@ Developer 2 files:
 | Assets/Scripts/Gameplay/PracticeResultsUI.cs | Recorded-distance dropdown, grouping/offset feedback and Practice retry/menu controls |
 | Assets/Scripts/Gameplay/ShotGroupingGraphic.cs | Target-face diagram, impact markers and centroid/RMS overlay |
 | Assets/Scripts/Gameplay/DesktopRangeControls.cs | Mode-aware Editor keyboard shortcuts |
-| Assets/Scripts/Gameplay/DesktopAimReticle.cs | Noninteractive Editor-only direction guide and draw feedback |
+| Assets/Scripts/Gameplay/DesktopAimReticle.cs | Noninteractive Editor-only draw-power feedback, without a crosshair |
 | Assets/Editor/Developer2/Developer2Setup.cs | Range/prefab generation and scene validation |
 | Assets/Editor/Developer2/RangePresentationArt.cs | Shared low-poly woodland scenery, mode decoration and lighting |
 | Assets/Prefabs/Target.prefab | Circular solid hit face, scoring rings and stand |
 | Assets/UI/GameUI.prefab, Assets/UI/ResultsUI.prefab | World-space menus, scoreboard and results |
-| Assets/UI/DesktopAimReticle.prefab | Desktop-only overlay sight, draw meter and hint |
+| Assets/UI/DesktopAimReticle.prefab | Desktop-only power bar and draw/release hint |
 | Assets/Materials/Developer2/ | Range and target materials |
 
 To adjust the rules, select **Range Managers** in ArcheryRange: edit ChallengeManager's
@@ -101,14 +102,14 @@ to match its static signs and track markers. The menu and HUD read the configure
 **Archery > Developer 2 > Create Range and Game Assets** creates missing Developer 2
 assets and opens the range. Existing gameplay prefabs are preserved.
 **Upgrade Range Presentation** rebuilds only the generated scenery, reconnects the two
-mode decorations and adds a missing desktop reticle; it also restores the default
+mode decorations and adds a missing desktop power bar; it also restores the default
 precision-course settings. Save modified scenes when prompted before switching.
 **Upgrade Practice Mode** updates the saved range to one target, removes the integrated
 left-hand Practice UI, and updates the right-hand slider and distance-based results.
 **Upgrade Practice Results** rebuilds only the independent Practice results panel in
 the results prefab and saved scene; the Competitive results panel remains intact.
 **Validate Current Scene** checks references, circular target colliders, mode decoration,
-noninteractive reticle, both UI input paths and the single VR rig/event system.
+noninteractive power overlay, both UI input paths and the single VR rig/event system.
 The Developer 1 runtime scripts, prefabs and VRTesting scene are reused rather than replaced.
 
 ### Integrated Unity verification
@@ -130,6 +131,13 @@ The integrated scenario reported no runtime errors or exceptions. Temporary veri
 scripts were removed afterward.
 This verifies the Editor preview, not physical headset tracking, controller-ray buttons,
 comfort, or device builds; those still need testing on the intended VR hardware.
+
+The crosshair-removal update passed 20 Play Mode checks using the actual bow in both
+Practice and Competitive: the bar remained visible, followed 35/70/100% draw, retained
+gold full-draw feedback, and reset on real arrow release. Each overlay contained only
+the bar background, fill and hint, without aiming graphics or clickable elements.
+Both rendered modes were inspected and scene validation passed. This was an Editor
+preview check, not a physical headset/controller test.
 
 ### Desktop mouse interaction fix
 

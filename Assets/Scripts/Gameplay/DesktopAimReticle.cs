@@ -4,7 +4,7 @@ using UnityEngine.XR;
 
 namespace VirtualArchery
 {
-    // A desktop direction guide, not a ballistic hit predictor or a headset overlay.
+    // Desktop draw-power feedback, not a crosshair or a headset overlay.
     public class DesktopAimReticle : MonoBehaviour
     {
         public GameManager game;
@@ -12,8 +12,6 @@ namespace VirtualArchery
         public Camera viewCamera;
         public Canvas canvas;
         public RectTransform sight;
-        public Image dot;
-        public RectTransform[] arms;
         public Image chargeFill;
         public Text hintText;
 
@@ -67,22 +65,13 @@ namespace VirtualArchery
         void ShowDraw(float amount)
         {
             amount = Mathf.Clamp01(amount);
-            if (dot != null) dot.color = Color.Lerp(RestColor, ChargedColor, amount);
             if (chargeFill != null)
             {
                 chargeFill.color = Color.Lerp(RestColor, ChargedColor, amount);
                 chargeFill.rectTransform.anchorMax = new Vector2(amount, 1f);
             }
-            float radius = Mathf.Lerp(16f, 9f, amount);
-            if (arms != null && arms.Length == 4)
-            {
-                arms[0].anchoredPosition = new Vector2(radius, 0);
-                arms[1].anchoredPosition = new Vector2(-radius, 0);
-                arms[2].anchoredPosition = new Vector2(0, radius);
-                arms[3].anchoredPosition = new Vector2(0, -radius);
-            }
             if (hintText != null)
-                hintText.text = amount >= .98f ? "FULL DRAW | release Space" : "AIM GUIDE | arrows drop";
+                hintText.text = amount >= .98f ? "FULL DRAW | release Space" : "POWER | hold Space";
         }
 
         void OnDisable()

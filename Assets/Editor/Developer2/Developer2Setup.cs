@@ -713,19 +713,6 @@ namespace VirtualArcheryEditor
                 scaler.referenceResolution = new Vector2(1920, 1080);
                 scaler.matchWidthOrHeight = .5f;
                 reticle.sight = Rect("Aim Guide", root.transform, new Vector2(100, 100), Vector2.zero).GetComponent<RectTransform>();
-                var outline = Rect("Dot Contrast", reticle.sight, new Vector2(5, 5), Vector2.zero).AddComponent<Image>();
-                outline.color = new Color(.025f, .04f, .04f, .85f);
-                reticle.dot = Rect("Dot", reticle.sight, new Vector2(3, 3), Vector2.zero).AddComponent<Image>();
-                reticle.dot.color = Color.white;
-                reticle.arms = new RectTransform[4];
-                var directions = new[] { Vector2.right, Vector2.left, Vector2.up, Vector2.down };
-                for (int i = 0; i < reticle.arms.Length; i++)
-                {
-                    var arm = Rect("Guide Arm " + (i + 1), reticle.sight, new Vector2(8, 2), directions[i] * 14);
-                    arm.AddComponent<Image>().color = Color.white;
-                    reticle.arms[i] = arm.GetComponent<RectTransform>();
-                    if (i > 1) arm.transform.localRotation = Quaternion.Euler(0, 0, 90);
-                }
                 var meter = Rect("Draw Meter Background", reticle.sight, new Vector2(44, 3), new Vector2(0, -22));
                 meter.AddComponent<Image>().color = new Color(.025f, .04f, .04f, .8f);
                 reticle.chargeFill = Rect("Draw Meter Fill", meter.transform, Vector2.zero, Vector2.zero).AddComponent<Image>();
@@ -733,7 +720,7 @@ namespace VirtualArcheryEditor
                 reticle.chargeFill.rectTransform.anchorMin = Vector2.zero;
                 reticle.chargeFill.rectTransform.anchorMax = new Vector2(0, 1);
                 reticle.chargeFill.rectTransform.sizeDelta = Vector2.zero;
-                reticle.hintText = Label(reticle.sight, "Aim Hint", "Aim guide | arrows drop", new Vector2(320, 22), new Vector2(0, -43), 15);
+                reticle.hintText = Label(reticle.sight, "Aim Hint", "POWER | hold Space", new Vector2(320, 22), new Vector2(0, -43), 15);
                 var shadow = reticle.hintText.gameObject.AddComponent<Shadow>();
                 shadow.effectColor = new Color(0, 0, 0, .85f);
                 shadow.effectDistance = new Vector2(1, -1);
@@ -850,8 +837,7 @@ namespace VirtualArcheryEditor
                 var reticle = reticles[0];
                 if (reticle.game == null || reticle.bow == null || reticle.viewCamera == null ||
                     reticle.canvas == null || reticle.canvas != reticle.GetComponent<Canvas>() ||
-                    reticle.sight == null || reticle.dot == null || reticle.chargeFill == null ||
-                    reticle.arms == null || reticle.arms.Length != 4 || reticle.arms.Any(arm => arm == null) ||
+                    reticle.sight == null || reticle.chargeFill == null || reticle.hintText == null ||
                     !reticle.gameObject.activeSelf)
                     errors.Add("Desktop aim reticle references/root activity are incomplete.");
                 else if (reticle.game.bow != reticle.bow || (rigs.Length == 1 && reticle.viewCamera != rigs[0].GetComponentInChildren<Camera>(true)))
