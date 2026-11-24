@@ -15,6 +15,10 @@ namespace VirtualArchery
         public ResultsManager results;
 
         public RangeState State { get; private set; } = RangeState.MainMenu;
+        public bool CanChangePracticeDistance => State == RangeState.Practice &&
+            practice != null && practice.IsPracticing && !practice.IsFinishing &&
+            score != null && score.PendingShots == 0 &&
+            bow != null && bow.DrawNormalized <= .001f;
         public event Action Changed;
         bool awaitingPracticeResult;
 
@@ -36,7 +40,7 @@ namespace VirtualArchery
             ResetSession();
             difficulty.SetPracticeLayout();
             State = RangeState.Practice;
-            score.BeginSession();
+            score.BeginSession(difficulty.ActiveTarget);
             practice.StartPractice();
             Changed?.Invoke();
         }
@@ -46,7 +50,7 @@ namespace VirtualArchery
             if (State != RangeState.MainMenu && State != RangeState.Results) return;
             ResetSession();
             State = RangeState.Competitive;
-            score.BeginSession();
+            score.BeginSession(null);
             challenge.StartChallenge();
             Changed?.Invoke();
         }
@@ -54,6 +58,13 @@ namespace VirtualArchery
         public void EndPractice()
         {
             if (State == RangeState.Practice) practice.EndPractice();
+        }
+
+        public void SetPracticeDistance(float distance)
+        {
+            if (!CanChangePracticeDistance) return;
+            difficulty.SetPracticeDistance(distance);
+            score.PracticeShots?.SetCurrentDistance(difficulty.PracticeDistance);
         }
 
         public void ReturnToMenu()

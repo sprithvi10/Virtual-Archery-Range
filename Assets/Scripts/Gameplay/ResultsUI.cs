@@ -13,6 +13,7 @@ namespace VirtualArchery
         public Text statsText;
         public Button retryButton;
         public Button menuButton;
+        public PracticeResultsUI practiceResults;
 
         Canvas canvas;
         TrackedDeviceGraphicRaycaster raycaster;
@@ -38,15 +39,21 @@ namespace VirtualArchery
             if (canvas != null) canvas.enabled = visible;
             if (raycaster != null) raycaster.enabled = visible;
             if (mouseRaycaster != null) mouseRaycaster.enabled = visible;
-            if (panel != null) panel.SetActive(visible);
+            bool practiceVisible = visible && results != null && !results.IsCompetitive;
+            if (panel != null) panel.SetActive(visible && !practiceVisible);
+            if (practiceResults != null) practiceResults.gameObject.SetActive(practiceVisible);
             if (!visible || results == null) return;
+            if (practiceVisible)
+            {
+                if (practiceResults != null) practiceResults.Show(results, game);
+                return;
+            }
             if (outcomeText != null) outcomeText.text = results.Outcome;
             if (statsText != null)
                 statsText.text = $"Final score: {results.Points}\nAccuracy: {results.Accuracy:0}%\n" +
                     $"Targets hit: {results.Hits} | Misses: {results.Misses}\nArrows fired: {results.Shots}\n" +
-                    (results.IsCompetitive ? $"Goal: {game.challenge.winningScore} points\n" +
-                    $"Range reached: {game.difficulty.Distance:0.#} m (stage {game.difficulty.Stage})" :
-                    "Practice builds consistency. Try Competitive when you are ready.");
+                    $"Goal: {game.challenge.winningScore} points\n" +
+                    $"Range reached: {game.difficulty.Distance:0.#} m (stage {game.difficulty.Stage})";
         }
 
         void OnDisable()

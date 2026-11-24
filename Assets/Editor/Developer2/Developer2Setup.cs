@@ -28,7 +28,7 @@ namespace VirtualArcheryEditor
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
                 throw new InvalidOperationException("Stop Play Mode before generating range assets.");
-            foreach (string path in new[] { "Assets/Prefabs/VRPlayer.prefab", "Assets/Prefabs/Bow.prefab", "Assets/UI/PracticeUI.prefab" })
+            foreach (string path in new[] { "Assets/Prefabs/VRPlayer.prefab", "Assets/Prefabs/Bow.prefab" })
                 if (AssetDatabase.LoadAssetAtPath<GameObject>(path) == null)
                     throw new InvalidOperationException("Run Developer 1 setup first. Missing " + path);
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -43,6 +43,10 @@ namespace VirtualArcheryEditor
             {
                 var scene = EditorSceneManager.OpenScene(ScenePath);
                 ApplyRangePresentation(scene);
+                var ui = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<GameUI>(true)).Single();
+                EnsurePracticeControls(ui);
+                RecordOverride(ui);
+                ApplyPracticeResults(scene);
                 EditorSceneManager.SaveScene(scene, ScenePath);
             }
             else
@@ -185,9 +189,189 @@ namespace VirtualArcheryEditor
             return button;
         }
 
+        static void EnsurePracticeControls(GameUI ui)
+        {
+            if (ui == null || ui.gameplayPanel == null)
+                throw new InvalidOperationException("GameUI needs its existing session panel.");
+            if (PrefabUtility.IsPartOfPrefabInstance(ui.gameObject))
+                PrefabUtility.UnpackPrefabInstance(PrefabUtility.GetOutermostPrefabInstanceRoot(ui.gameObject),
+                    PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            if (ui.practiceDistanceSlider != null)
+                UnityEngine.Object.DestroyImmediate(ui.practiceDistanceSlider.gameObject);
+            var oldLabel = ui.gameplayPanel.transform.Find("Practice Distance");
+            if (oldLabel != null) UnityEngine.Object.DestroyImmediate(oldLabel.gameObject);
+            ui.practiceDistanceText = Label(ui.gameplayPanel.transform, "Practice Distance", "Target distance · 6 m",
+                new Vector2(900, 42), new Vector2(0, -74), 26);
+            var sliderRoot = Rect("Practice Distance Slider", ui.gameplayPanel.transform, new Vector2(820, 38), new Vector2(0, -120));
+            var track = sliderRoot.AddComponent<Image>();
+            track.color = new Color(.17f, .23f, .28f);
+            var handle = Rect("Handle", sliderRoot.transform, new Vector2(38, 52), Vector2.zero);
+            var handleImage = handle.AddComponent<Image>();
+            handleImage.color = new Color(.2f, .85f, .62f);
+            var slider = sliderRoot.AddComponent<Slider>();
+            slider.targetGraphic = handleImage;
+            slider.handleRect = handle.GetComponent<RectTransform>();
+            slider.minValue = 6;
+            slider.maxValue = 12;
+            slider.wholeNumbers = false;
+            slider.value = 6;
+            ui.practiceDistanceSlider = slider;
+            Label(sliderRoot.transform, "Minimum", "6 m", new Vector2(120, 35), new Vector2(-380, -42), 22);
+            Label(sliderRoot.transform, "Maximum", "12 m", new Vector2(120, 35), new Vector2(380, -42), 22);
+            ui.scoreText.rectTransform.sizeDelta = new Vector2(920, 110);
+            ui.scoreText.rectTransform.anchoredPosition = new Vector2(0, 130);
+            ui.feedbackText.rectTransform.anchoredPosition = new Vector2(0, 45);
+            ui.drawMeter.GetComponent<RectTransform>().anchoredPosition = new Vector2(0, -6);
+            ui.helpText.rectTransform.sizeDelta = new Vector2(920, 65);
+            ui.helpText.rectTransform.anchoredPosition = new Vector2(0, -207);
+            ui.helpText.fontSize = 20;
+            ui.endPracticeButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(-225, -300);
+            ui.menuButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(225, -300);
+            foreach (var button in new[] { ui.endPracticeButton, ui.menuButton })
+            {
+                button.GetComponent<RectTransform>().sizeDelta = new Vector2(430, 70);
+                var label = button.GetComponentInChildren<Text>(true);
+                label.rectTransform.sizeDelta = new Vector2(410, 65);
+                label.fontSize = 26;
+            }
+        }
+
+        static Dropdown DistanceDropdown(Transform parent)
+        {
+            var root = Rect("Recorded Distances", parent, new Vector2(650, 62), new Vector2(-410, -345));
+            var image = root.AddComponent<Image>();
+            image.color = new Color(.055f, .42f, .35f);
+            var dropdown = root.AddComponent<Dropdown>();
+            dropdown.targetGraphic = image;
+            dropdown.captionText = Label(root.transform, "Selected Distance", "6 m · 0 impacts  ▾", new Vector2(610, 58), Vector2.zero, 26);
+            var template = Rect("Template", root.transform, new Vector2(650, 260), new Vector2(0, -162));
+            template.AddComponent<Image>().color = Ink;
+            var scroll = template.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 35;
+            var viewport = Rect("Viewport", template.transform, new Vector2(630, 250), Vector2.zero);
+            viewport.AddComponent<Image>().color = Color.white;
+            viewport.AddComponent<Mask>().showMaskGraphic = false;
+            var content = Rect("Content", viewport.transform, new Vector2(630, 54), Vector2.zero);
+            var contentRect = content.GetComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0, 1);
+            contentRect.anchorMax = Vector2.one;
+            contentRect.pivot = new Vector2(.5f, 1);
+            contentRect.sizeDelta = new Vector2(0, 54);
+            var item = Rect("Item", content.transform, new Vector2(630, 54), Vector2.zero);
+            var itemRect = item.GetComponent<RectTransform>();
+            itemRect.anchorMin = new Vector2(0, .5f);
+            itemRect.anchorMax = new Vector2(1, .5f);
+            itemRect.sizeDelta = new Vector2(0, 54);
+            var itemImage = item.AddComponent<Image>();
+            itemImage.color = new Color(.08f, .24f, .25f);
+            var toggle = item.AddComponent<Toggle>();
+            toggle.targetGraphic = itemImage;
+            var check = Rect("Selected", item.transform, new Vector2(12, 38), new Vector2(-300, 0)).AddComponent<Image>();
+            check.color = new Color(.2f, .85f, .62f);
+            toggle.graphic = check;
+            dropdown.itemText = Label(item.transform, "Distance", "6 m · 0 impacts", new Vector2(570, 52), Vector2.zero, 25);
+            scroll.viewport = viewport.GetComponent<RectTransform>();
+            scroll.content = contentRect;
+            dropdown.template = template.GetComponent<RectTransform>();
+            template.SetActive(false);
+            return dropdown;
+        }
+
+        [MenuItem("Archery/Developer 2/Upgrade Practice Mode")]
+        public static void UpgradePracticeMode()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Stop Play Mode before upgrading Practice mode.");
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
+                throw new InvalidOperationException("Create ArcheryRange before upgrading Practice mode.");
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            CreateGameUI();
+            CreateResultsUI();
+            AssetDatabase.SaveAssets();
+            var scene = EditorSceneManager.OpenScene(ScenePath);
+            var game = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<GameManager>(true)).Single();
+            MigratePracticeScene(scene, game);
+            var ui = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<GameUI>(true)).Single();
+            EnsurePracticeControls(ui);
+            ui.game = game;
+            RecordOverride(ui);
+            ApplyPracticeResults(scene);
+            ReplacePracticeScenery(scene, game.difficulty);
+            EditorSceneManager.MarkSceneDirty(scene);
+            AssetDatabase.SaveAssets();
+            EditorSceneManager.SaveScene(scene, ScenePath);
+            Debug.Log("Practice mode upgraded: one central target, right distance slider and scrollable distance results. Competitive rules and panel preserved.");
+        }
+
+        static void ReplacePracticeScenery(Scene scene, DifficultyManager difficulty)
+        {
+            var oldEnvironment = scene.GetRootGameObjects().Where(root => root.name == "Range Environment").ToArray();
+            var environment = RangePresentationArt.Create(out var practiceDecor, out var competitiveDecor);
+            if (environment.scene != scene) SceneManager.MoveGameObjectToScene(environment, scene);
+            foreach (var oldRoot in oldEnvironment) UnityEngine.Object.DestroyImmediate(oldRoot);
+            difficulty.practiceDecor = practiceDecor;
+            difficulty.competitiveDecor = competitiveDecor;
+            RecordOverride(difficulty);
+        }
+
+        static void MigratePracticeScene(Scene scene, GameManager game)
+        {
+            var targets = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<Target>(true)).ToArray();
+            var target = game.difficulty.target;
+            if (target == null)
+                target = targets.OrderBy(item => Mathf.Abs(item.transform.position.x)).FirstOrDefault();
+            if (target == null) throw new InvalidOperationException("Practice upgrade needs an existing central target.");
+            game.difficulty.target = target;
+            foreach (var obsolete in targets)
+                if (obsolete != target) UnityEngine.Object.DestroyImmediate(obsolete.gameObject);
+            target.transform.position = new Vector3(0, target.transform.position.y, game.difficulty.PracticeDistance);
+            target.gameObject.SetActive(true);
+            RecordOverride(target.transform);
+            RecordOverride(target.gameObject);
+            RecordOverride(game.difficulty);
+            var practice = game.practice;
+            if (practice == null) throw new InvalidOperationException("Practice upgrade needs the existing PracticeManager.");
+            var tutorial = practice.GetComponent<TutorialManager>();
+            if (tutorial == null) throw new InvalidOperationException("Practice upgrade needs the existing TutorialManager.");
+            // Unpack the scene instance only: never alter Developer 1's standalone assets.
+            if (PrefabUtility.IsPartOfPrefabInstance(practice.gameObject))
+                PrefabUtility.UnpackPrefabInstance(PrefabUtility.GetOutermostPrefabInstanceRoot(practice.gameObject),
+                    PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            var oldUI = practice.GetComponent<PracticeUI>();
+            if (oldUI != null) UnityEngine.Object.DestroyImmediate(oldUI);
+            foreach (Transform child in practice.transform.Cast<Transform>().ToArray())
+                UnityEngine.Object.DestroyImmediate(child.gameObject);
+            foreach (var raycaster in practice.GetComponents<BaseRaycaster>())
+                UnityEngine.Object.DestroyImmediate(raycaster);
+            var scaler = practice.GetComponent<CanvasScaler>();
+            if (scaler != null) UnityEngine.Object.DestroyImmediate(scaler);
+            var canvas = practice.GetComponent<Canvas>();
+            if (canvas != null) UnityEngine.Object.DestroyImmediate(canvas);
+            practice.gameObject.name = "Practice Gameplay";
+            practice.gameObject.SetActive(true);
+            practice.bow = game.bow;
+            practice.autoStart = false;
+            tutorial.bow = game.bow;
+            tutorial.practice = practice;
+            RecordOverride(practice);
+            RecordOverride(tutorial);
+        }
+
         static void CreateGameUI()
         {
-            if (AssetDatabase.LoadAssetAtPath<GameObject>(UIPath) != null) return;
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(UIPath) != null)
+            {
+                var existing = PrefabUtility.LoadPrefabContents(UIPath);
+                try
+                {
+                    EnsurePracticeControls(existing.GetComponent<GameUI>());
+                    PrefabUtility.SaveAsPrefabAsset(existing, UIPath);
+                }
+                finally { PrefabUtility.UnloadPrefabContents(existing); }
+                return;
+            }
             var root = CanvasRoot("GameUI");
             try
             {
@@ -225,6 +409,7 @@ namespace VirtualArcheryEditor
                 ui.endPracticeButton = Button(ui.gameplayPanel.transform, "End Practice", new Vector2(0, -220));
                 ui.menuButton = Button(ui.gameplayPanel.transform, "Return to Menu", new Vector2(0, -305));
                 ui.gameplayPanel.SetActive(false);
+                EnsurePracticeControls(ui);
                 PrefabUtility.SaveAsPrefabAsset(root, UIPath);
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
@@ -232,7 +417,19 @@ namespace VirtualArcheryEditor
 
         static void CreateResultsUI()
         {
-            if (AssetDatabase.LoadAssetAtPath<GameObject>(ResultsPath) != null) return;
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(ResultsPath) != null)
+            {
+                var existing = PrefabUtility.LoadPrefabContents(ResultsPath);
+                try
+                {
+                    var ui = existing.GetComponent<ResultsUI>();
+                    if (ui == null) throw new InvalidOperationException("ResultsUI prefab is missing its ResultsUI component.");
+                    EnsurePracticeResults(ui);
+                    PrefabUtility.SaveAsPrefabAsset(existing, ResultsPath);
+                }
+                finally { PrefabUtility.UnloadPrefabContents(existing); }
+                return;
+            }
             var root = CanvasRoot("ResultsUI");
             try
             {
@@ -245,9 +442,100 @@ namespace VirtualArcheryEditor
                 ui.retryButton = Button(ui.panel.transform, "Try Again", new Vector2(0, -170));
                 ui.menuButton = Button(ui.panel.transform, "Return to Menu", new Vector2(0, -265));
                 ui.panel.SetActive(false);
+                EnsurePracticeResults(ui);
                 PrefabUtility.SaveAsPrefabAsset(root, ResultsPath);
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        static void EnsurePracticeResults(ResultsUI ui)
+        {
+            if (PrefabUtility.IsPartOfPrefabInstance(ui.gameObject))
+                PrefabUtility.UnpackPrefabInstance(PrefabUtility.GetOutermostPrefabInstanceRoot(ui.gameObject),
+                    PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            foreach (var oldPanel in ui.GetComponentsInChildren<PracticeResultsUI>(true))
+                UnityEngine.Object.DestroyImmediate(oldPanel.gameObject);
+
+            var panel = Rect("Practice Results", ui.transform, new Vector2(1600, 960), Vector2.zero);
+            panel.transform.localScale = Vector3.one * 1.2f;
+            panel.AddComponent<Image>().color = Ink;
+            // Keep this independent of the original Competitive panel and all its references.
+            panel.SetActive(false);
+            var practice = panel.AddComponent<PracticeResultsUI>();
+            ui.practiceResults = practice;
+            Label(panel.transform, "Heading", "PRACTICE RESULTS", new Vector2(1500, 70), new Vector2(0, 410), 42);
+            Label(panel.transform, "Caption", "Shot grouping by distance · plotted target impacts only",
+                new Vector2(1500, 48), new Vector2(0, 350), 26);
+
+            practice.distanceText = Label(panel.transform, "Distance", "6 m · 0 impacts",
+                new Vector2(650, 60), new Vector2(-410, 280), 30);
+            practice.diagram = Rect("Shot Grouping", panel.transform, new Vector2(440, 440), new Vector2(-410, 5))
+                .AddComponent<ShotGroupingGraphic>();
+            practice.diagram.raycastTarget = false;
+            Label(panel.transform, "Diagram Legend", "White dots: impacts   +: mean impact\nCircle: RMS spread (3+ impacts)",
+                new Vector2(700, 75), new Vector2(-410, -265), 23);
+            practice.distanceDropdown = DistanceDropdown(panel.transform);
+
+            practice.statsText = Label(panel.transform, "Practice Statistics", "",
+                new Vector2(690, 205), new Vector2(375, 205), 30);
+            practice.analysisText = Label(panel.transform, "Grouping Analysis", "",
+                new Vector2(690, 270), new Vector2(375, -45), 27);
+            practice.unplottedText = Label(panel.transform, "Unplotted Shots", "",
+                new Vector2(690, 125), new Vector2(375, -260), 24);
+            practice.retryButton = Button(panel.transform, "Try Again", new Vector2(-330, -430), 560);
+            practice.menuButton = Button(panel.transform, "Return to Menu", new Vector2(330, -430), 560);
+        }
+
+        [MenuItem("Archery/Developer 2/Upgrade Practice Results")]
+        public static void UpgradePracticeResults()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Stop Play Mode before upgrading Practice results.");
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null ||
+                AssetDatabase.LoadAssetAtPath<GameObject>(ResultsPath) == null)
+                throw new InvalidOperationException("Create ArcheryRange and ResultsUI before upgrading Practice results.");
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+
+            CreateResultsUI();
+            AssetDatabase.SaveAssets();
+            // Reload the saved scene, rather than saving edits declined in the prompt above.
+            var scene = EditorSceneManager.OpenScene(ScenePath);
+            ApplyPracticeResults(scene);
+            AssetDatabase.SaveAssets();
+            EditorSceneManager.SaveScene(scene, ScenePath);
+            Debug.Log("Practice results upgraded. The original Competitive panel, existing prefab GUID and range objects were preserved.");
+        }
+
+        static void ApplyPracticeResults(Scene scene)
+        {
+            var components = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<Component>(true))
+                .Where(component => component != null).ToArray();
+            var uis = components.OfType<ResultsUI>().ToArray();
+            var games = components.OfType<GameManager>().ToArray();
+            if (uis.Length != 1 || games.Length != 1 || games[0].results == null)
+                throw new InvalidOperationException("Practice results upgrade requires one existing ResultsUI and one GameManager with ResultsManager.");
+
+            var ui = uis[0];
+            EnsurePracticeResults(ui);
+            ui.game = games[0];
+            ui.results = games[0].results;
+            var canvas = ui.GetComponent<Canvas>();
+            if (canvas == null || ui.GetComponent<TrackedDeviceGraphicRaycaster>() == null ||
+                ui.GetComponent<GraphicRaycaster>() == null)
+                throw new InvalidOperationException("ResultsUI requires its existing Canvas, tracked-device raycaster and mouse graphic raycaster.");
+            if (canvas.worldCamera == null)
+            {
+                var rig = components.OfType<VRPlayerSetup>().SingleOrDefault();
+                canvas.worldCamera = rig != null ? rig.GetComponentInChildren<Camera>(true) : null;
+                if (canvas.worldCamera == null)
+                    throw new InvalidOperationException("Practice results upgrade requires the existing player camera.");
+            }
+            // Explicitly persist the scene's panel and manager bindings, including prefab-instance overrides.
+            RecordOverride(ui);
+            RecordOverride(canvas);
+            RecordOverride(ui.practiceResults);
+            RecordOverride(ui.practiceResults.gameObject);
+            EditorSceneManager.MarkSceneDirty(scene);
         }
 
         static GameObject Instance(string path)
@@ -266,22 +554,13 @@ namespace VirtualArcheryEditor
             if (camera == null) throw new InvalidOperationException("VRPlayer needs a camera.");
             var bow = Instance("Assets/Prefabs/Bow.prefab").GetComponent<BowController>();
             bow.transform.position = new Vector3(0, 1.15f, .55f);
-            var practiceObject = Instance("Assets/UI/PracticeUI.prefab");
-            if (practiceObject.GetComponent<GraphicRaycaster>() == null) practiceObject.AddComponent<GraphicRaycaster>();
-            practiceObject.transform.SetPositionAndRotation(new Vector3(-1.35f, 1.5f, 1.8f), Quaternion.Euler(0, -25, 0));
-            var practice = practiceObject.GetComponent<PracticeManager>();
+            var practiceObject = new GameObject("Practice Gameplay");
+            var practice = practiceObject.AddComponent<PracticeManager>();
             practice.bow = bow;
             practice.autoStart = false;
-            var tutorial = practiceObject.GetComponent<TutorialManager>();
+            var tutorial = practiceObject.AddComponent<TutorialManager>();
             tutorial.bow = bow;
             tutorial.practice = practice;
-            var practiceCanvas = practiceObject.GetComponent<Canvas>();
-            practiceCanvas.worldCamera = camera;
-            practiceCanvas.enabled = false;
-            var originalUI = practiceObject.GetComponent<PracticeUI>();
-            originalUI.startButton.gameObject.SetActive(false);
-            originalUI.endButton.gameObject.SetActive(false);
-            if (originalUI.desktopHelp != null) originalUI.desktopHelp.SetActive(false);
 
             var managers = new GameObject("Range Managers");
             var score = managers.AddComponent<ScoreManager>();
@@ -290,14 +569,9 @@ namespace VirtualArcheryEditor
             var results = managers.AddComponent<ResultsManager>();
             var game = managers.AddComponent<GameManager>();
             score.bow = bow;
-            difficulty.targets = new Target[3];
-            for (int i = 0; i < 3; i++)
-            {
-                var target = Instance(TargetPath).GetComponent<Target>();
-                target.name = "Target " + (i + 1);
-                target.transform.position = new Vector3((i - 1) * 2.2f, 1.5f, 6 + i * 3);
-                difficulty.targets[i] = target;
-            }
+            difficulty.target = Instance(TargetPath).GetComponent<Target>();
+            difficulty.target.name = "Target";
+            difficulty.target.transform.position = new Vector3(0, 1.5f, 6);
             difficulty.hitsToAdvance = 3;
             difficulty.minimumQualifyingPoints = 6;
             difficulty.transitionDuration = 1;
@@ -318,7 +592,6 @@ namespace VirtualArcheryEditor
             var ui = Instance(UIPath).GetComponent<GameUI>();
             ui.transform.position = new Vector3(0, 1.65f, 2);
             ui.game = game;
-            ui.practiceCanvas = practiceCanvas;
             ui.GetComponent<Canvas>().worldCamera = camera;
             var resultsUI = Instance(ResultsPath).GetComponent<ResultsUI>();
             resultsUI.transform.position = new Vector3(0, 1.65f, 2);
@@ -380,8 +653,7 @@ namespace VirtualArcheryEditor
                 throw new InvalidOperationException("Presentation upgrade requires one wired GameManager with difficulty and bow.");
             var game = games[0];
             var difficulty = game.difficulty;
-            if (difficulty.targets == null || difficulty.targets.Length != 3 || difficulty.targets.Any(target => target == null))
-                throw new InvalidOperationException("Presentation upgrade requires the existing three target references.");
+            MigratePracticeScene(scene, game);
             var rig = components.OfType<VRPlayerSetup>().SingleOrDefault();
             var camera = rig != null ? rig.GetComponentInChildren<Camera>(true) : null;
             if (camera == null) throw new InvalidOperationException("Presentation upgrade requires the existing player camera.");
@@ -391,23 +663,19 @@ namespace VirtualArcheryEditor
 
             // Build successfully before replacing only the owned generated environment.
             var oldEnvironment = scene.GetRootGameObjects().Where(root => root.name == "Range Environment").ToArray();
-            var environment = RangePresentationArt.Create(out var practiceLanes, out var competitiveDecor);
+            var environment = RangePresentationArt.Create(out var practiceDecor, out var competitiveDecor);
             if (environment.scene != scene) SceneManager.MoveGameObjectToScene(environment, scene);
             foreach (var oldRoot in oldEnvironment) UnityEngine.Object.DestroyImmediate(oldRoot);
-            difficulty.practiceLanes = practiceLanes;
+            difficulty.practiceDecor = practiceDecor;
             difficulty.competitiveDecor = competitiveDecor;
             difficulty.hitsToAdvance = 3;
             difficulty.minimumQualifyingPoints = 6;
             difficulty.transitionDuration = 1;
             difficulty.distances = new[] { 6f, 9f, 12f };
-            for (int i = 0; i < difficulty.targets.Length; i++)
-            {
-                var target = difficulty.targets[i];
-                target.transform.position = new Vector3((i - 1) * 2.2f, target.transform.position.y, difficulty.distances[i]);
-                target.gameObject.SetActive(true);
-                RecordOverride(target.transform);
-                RecordOverride(target.gameObject);
-            }
+            difficulty.target.transform.position = new Vector3(0, difficulty.target.transform.position.y, difficulty.PracticeDistance);
+            difficulty.target.gameObject.SetActive(true);
+            RecordOverride(difficulty.target.transform);
+            RecordOverride(difficulty.target.gameObject);
             camera.clearFlags = CameraClearFlags.Skybox;
             camera.farClipPlane = Mathf.Max(camera.farClipPlane, 180);
             var reticle = reticles.Length == 1 ? reticles[0] : Instance(ReticlePath).GetComponent<DesktopAimReticle>();
@@ -496,23 +764,23 @@ namespace VirtualArcheryEditor
                 {
                     if (game.practice.bow != game.bow || game.practice.autoStart || !game.practice.gameObject.activeSelf) errors.Add("PracticeManager must reference Bow, remain active, and not auto-start.");
                     if (game.score.bow != game.bow || game.challenge.bow != game.bow || game.challenge.score != game.score || game.challenge.difficulty != game.difficulty) errors.Add("Scoring/challenge manager references are broken.");
-                    if (game.difficulty.targets == null || game.difficulty.targets.Length != 3 || game.difficulty.targets.Any(t => t == null)) errors.Add("Difficulty needs all three targets.");
+                    if (game.difficulty.target == null) errors.Add("Difficulty needs the single central target.");
                     var difficulty = game.difficulty;
                     if (difficulty.distances == null || !difficulty.distances.SequenceEqual(new[] { 6f, 9f, 12f }) ||
                         difficulty.hitsToAdvance < 1 || difficulty.minimumQualifyingPoints < 0 || difficulty.transitionDuration <= 0)
                         errors.Add("Difficulty needs the 6/9/12 m course, a positive streak length, nonnegative qualifying points and a positive move duration.");
-                    if (difficulty.practiceLanes == null || difficulty.competitiveDecor == null ||
-                        difficulty.practiceLanes == difficulty.competitiveDecor ||
-                        difficulty.practiceLanes.transform.parent == null ||
-                        difficulty.practiceLanes.transform.parent != difficulty.competitiveDecor.transform.parent ||
-                        difficulty.practiceLanes.transform.parent.name != "Range Environment")
-                        errors.Add("Distinct Practice Lanes and Competitive Course roots must belong to the generated Range Environment.");
+                    if (difficulty.practiceDecor == null || difficulty.competitiveDecor == null ||
+                        difficulty.practiceDecor == difficulty.competitiveDecor ||
+                        difficulty.practiceDecor.transform.parent == null ||
+                        difficulty.practiceDecor.transform.parent != difficulty.competitiveDecor.transform.parent ||
+                        difficulty.practiceDecor.transform.parent.name != "Range Environment")
+                        errors.Add("Distinct Practice Distance Guide and Competitive Course roots must belong to the generated Range Environment.");
                     var tutorial = game.practice.GetComponent<TutorialManager>();
                     if (tutorial == null || tutorial.bow != game.bow || tutorial.practice != game.practice) errors.Add("Tutorial references are broken.");
                 }
             }
             var targets = components.OfType<Target>().ToArray();
-            if (targets.Length != 3) errors.Add("Three scoring targets are required.");
+            if (targets.Length != 1) errors.Add("Exactly one scoring target is required.");
             foreach (var target in targets)
                 if (target.feedbackRenderer == null || target.radius <= 0 || target.GetComponent<MeshCollider>()?.sharedMesh == null || target.transform.localScale != Vector3.one) errors.Add("Target needs feedback renderer, circular mesh collider, positive radius and unit scale: " + target.name);
             var gameUIs = components.OfType<GameUI>().ToArray();
@@ -520,12 +788,17 @@ namespace VirtualArcheryEditor
             else
             {
                 var ui = gameUIs[0];
-                if (ui.game == null || ui.practiceCanvas == null || ui.titleText == null || ui.statusText == null || ui.rulesText == null || ui.scoreText == null || ui.feedbackText == null || ui.helpText == null || ui.menuPanel == null || ui.gameplayPanel == null || ui.practiceButton == null || ui.competitiveButton == null || ui.endPracticeButton == null || ui.menuButton == null || ui.drawMeter == null || !ui.gameObject.activeSelf) errors.Add("GameUI references/root activity are incomplete.");
-                if (ui.practiceCanvas != null && ui.game != null && ui.game.practice != null)
-                {
-                    var original = ui.game.practice.GetComponent<PracticeUI>();
-                    if (original == null || original.startButton == null || original.endButton == null || original.startButton.gameObject.activeSelf || original.endButton.gameObject.activeSelf) errors.Add("Original practice start/end controls must be hidden.");
-                }
+                if (ui.game == null || ui.titleText == null || ui.statusText == null || ui.rulesText == null || ui.scoreText == null || ui.feedbackText == null || ui.helpText == null || ui.menuPanel == null || ui.gameplayPanel == null || ui.practiceButton == null || ui.competitiveButton == null || ui.endPracticeButton == null || ui.menuButton == null || ui.drawMeter == null || !ui.gameObject.activeSelf) errors.Add("GameUI references/root activity are incomplete.");
+                if (ui.practiceDistanceSlider == null || ui.practiceDistanceText == null ||
+                    ui.practiceDistanceSlider.minValue != 6 || ui.practiceDistanceSlider.maxValue != 12 ||
+                    ui.practiceDistanceSlider.wholeNumbers || ui.practiceDistanceSlider.handleRect == null ||
+                    ui.gameplayPanel == null ||
+                    !ui.practiceDistanceSlider.transform.IsChildOf(ui.gameplayPanel.transform) ||
+                    !ui.practiceDistanceText.transform.IsChildOf(ui.gameplayPanel.transform))
+                    errors.Add("Right session panel needs a continuous 6–12 m Practice slider, handle and distance label.");
+                if (components.OfType<PracticeUI>().Any() ||
+                    (ui.game != null && ui.game.practice != null && ui.game.practice.GetComponentInChildren<Canvas>(true) != null))
+                    errors.Add("Integrated left Practice UI must be removed while retaining gameplay managers.");
             }
             var resultUIs = components.OfType<ResultsUI>().ToArray();
             if (resultUIs.Length != 1) errors.Add("Exactly one ResultsUI is required.");
@@ -533,6 +806,42 @@ namespace VirtualArcheryEditor
             {
                 var ui = resultUIs[0];
                 if (ui.game == null || ui.results == null || ui.panel == null || ui.outcomeText == null || ui.statsText == null || ui.retryButton == null || ui.menuButton == null || !ui.gameObject.activeSelf) errors.Add("ResultsUI references/root activity are incomplete.");
+                var practice = ui.practiceResults;
+                if (practice == null || components.OfType<PracticeResultsUI>().Count() != 1)
+                    errors.Add("Exactly one PracticeResultsUI must be bound to ResultsUI.");
+                if (practice != null)
+                {
+                    if (practice.transform.parent != ui.transform || practice.gameObject == ui.panel ||
+                        (ui.panel != null && practice.transform.IsChildOf(ui.panel.transform)))
+                        errors.Add("Practice results must be a separate panel directly under the ResultsUI canvas, not inside Competitive results.");
+                    if (practice.diagram == null || practice.statsText == null || practice.distanceText == null ||
+                        practice.analysisText == null || practice.unplottedText == null ||
+                        practice.retryButton == null || practice.menuButton == null ||
+                        practice.distanceDropdown == null || practice.distanceDropdown.template == null ||
+                        practice.distanceDropdown.template.GetComponent<ScrollRect>() == null ||
+                        practice.distanceDropdown.itemText == null ||
+                        practice.distanceDropdown.template.GetComponentInChildren<Toggle>(true) == null)
+                        errors.Add("Practice results needs diagram, distance/analysis/statistics text, scrollable distance dropdown and retry/menu controls.");
+                    else
+                    {
+                        if (practice.diagram.raycastTarget)
+                            errors.Add("Practice shot grouping diagram must not receive raycasts.");
+                        if (practice.diagram.GetComponent<CanvasRenderer>() == null)
+                            errors.Add("Practice shot grouping diagram needs a CanvasRenderer to display its mesh.");
+                        var boundControls = new Component[]
+                        {
+                            practice.diagram, practice.statsText, practice.distanceText, practice.analysisText,
+                            practice.unplottedText, practice.retryButton, practice.menuButton,
+                            practice.distanceDropdown
+                        };
+                        if (boundControls.Any(control => !control.transform.IsChildOf(practice.transform)))
+                            errors.Add("Practice results controls must belong only to the separate Practice panel.");
+                        if (practice.distanceDropdown.targetGraphic == null || !practice.distanceDropdown.targetGraphic.raycastTarget ||
+                            practice.retryButton.targetGraphic == null || !practice.retryButton.targetGraphic.raycastTarget ||
+                            practice.menuButton.targetGraphic == null || !practice.menuButton.targetGraphic.raycastTarget)
+                            errors.Add("Practice results buttons need raycast-target graphics for mouse and XR interaction.");
+                    }
+                }
             }
             var reticles = components.OfType<DesktopAimReticle>().ToArray();
             if (reticles.Length != 1) errors.Add("Exactly one desktop aim reticle is required.");

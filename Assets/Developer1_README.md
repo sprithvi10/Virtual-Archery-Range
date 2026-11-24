@@ -10,9 +10,10 @@ Open **Assets/Scenes/ArcheryRange.unity** and press **Play**. This is the first 
 build scene; the existing sample and Developer 1 test scenes remain available.
 Use the main menu to choose Practice or Competitive.
 
-- **Practice:** three fixed lanes at 6 m, 9 m and 12 m, unlimited arrows, no timer,
-  the original tutorial and immediate feedback. Choose **End Practice** on the
-  right-hand session panel to see final results.
+- **Practice:** one central target, unlimited arrows and no timer. Use the distance
+  slider on the **right-hand session panel** to position the target from **6 m to 12 m**
+  in 0.1 m steps. The old left-hand Practice menu has been removed. Choose **End Practice**
+  on the right to see the shot-grouping results.
 - **Competitive:** one central target, 60 seconds, 12 arrows, and at least 50 points
   to win by default. Three consecutive blue-ring-or-better hits (6+ points each)
   earn the next distance: 6 m, then 9 m, then 12 m. A weak hit or miss resets the
@@ -26,6 +27,28 @@ Use the main menu to choose Practice or Competitive.
   **Return to Menu** resets the session.
   Ending practice, exhausting arrows or reaching the time limit first disables shooting,
   then waits for all launched arrows to resolve before displaying the final statistics.
+
+### Practice shot grouping
+
+After **End Practice**, choose a recorded distance in the dropdown to inspect its target
+impacts. Shots from different distances are kept separate; returning to an earlier
+distance adds to that distance's existing group. The most-populated group opens first.
+White dots mark impacts; the cyan cross marks their average and the cyan circle shows
+RMS spread around that average.
+
+Spread measures consistency; distance of the average from the bullseye measures
+aiming offset. Feedback calls a group tight or near-centre at no more than 20% of
+the target radius, respectively. These are simple impact-based indicators, not a
+diagnosis of physical shooting form. Fewer than three impacts show an insufficient-sample
+message instead of grouping advice.
+
+The slider is locked while the bow is drawn, arrows are airborne, or Practice is finishing,
+so moving the target cannot relabel a flying shot. Ground/backstop hits and timeouts
+have no target-face coordinates: they remain in session statistics and the
+**Off-target / unplotted** count, but are not invented as points on a diagram.
+Empty results show the selected distance. Ending Practice waits for airborne arrows;
+**Try Again** starts fresh grouping data while retaining the selected target distance.
+Competitive retains its original results board, scoring and progression without diagrams.
 
 Without a headset, click the Game view: **1** selects Practice, **2** selects Competitive,
 hold **right mouse** to aim, hold/release **Space** to draw/shoot, **E** ends Practice,
@@ -43,8 +66,8 @@ arrows still drop. It hides on menus/results, while finishing airborne shots and
 the target moves, and is disabled in headset play and player builds. It cannot intercept clicks.
 
 The **Cedar Hollow** woodland setting uses shared low-poly trees, layered ridges, warm
-afternoon lighting, a timber shelter, fencing and a framed backstop. Practice has lane
-guides and distance signs; Competitive replaces them with a single precision-course track.
+afternoon lighting, a timber shelter, fencing and a framed backstop. Practice has a central
+range guide and 6/12 m markers; Competitive uses its precision-course track.
 
 Developer 2 files:
 
@@ -56,8 +79,11 @@ Developer 2 files:
 | Assets/Scripts/Gameplay/ChallengeManager.cs | Timer, arrow budget, finishing state and win threshold |
 | Assets/Scripts/Gameplay/DifficultyManager.cs | Precision streaks, earned target slides and mode-specific layouts |
 | Assets/Scripts/Gameplay/ResultsManager.cs | Frozen final session statistics |
-| Assets/Scripts/Gameplay/GameUI.cs | Main menu, live scoreboard, draw meter and practice-panel visibility |
+| Assets/Scripts/Gameplay/GameUI.cs | Main menu, right-hand session controls, distance slider, scoreboard and draw meter |
 | Assets/Scripts/Gameplay/ResultsUI.cs | Results board, retry and menu controls |
+| Assets/Scripts/Gameplay/PracticeShotSummary.cs | Practice impacts by distance, online centroid/spread and unplotted count |
+| Assets/Scripts/Gameplay/PracticeResultsUI.cs | Recorded-distance dropdown, grouping/offset feedback and Practice retry/menu controls |
+| Assets/Scripts/Gameplay/ShotGroupingGraphic.cs | Target-face diagram, impact markers and centroid/RMS overlay |
 | Assets/Scripts/Gameplay/DesktopRangeControls.cs | Mode-aware Editor keyboard shortcuts |
 | Assets/Scripts/Gameplay/DesktopAimReticle.cs | Noninteractive Editor-only direction guide and draw feedback |
 | Assets/Editor/Developer2/Developer2Setup.cs | Range/prefab generation and scene validation |
@@ -77,25 +103,31 @@ assets and opens the range. Existing gameplay prefabs are preserved.
 **Upgrade Range Presentation** rebuilds only the generated scenery, reconnects the two
 mode decorations and adds a missing desktop reticle; it also restores the default
 precision-course settings. Save modified scenes when prompted before switching.
+**Upgrade Practice Mode** updates the saved range to one target, removes the integrated
+left-hand Practice UI, and updates the right-hand slider and distance-based results.
+**Upgrade Practice Results** rebuilds only the independent Practice results panel in
+the results prefab and saved scene; the Competitive results panel remains intact.
 **Validate Current Scene** checks references, circular target colliders, mode decoration,
 noninteractive reticle, both UI input paths and the single VR rig/event system.
 The Developer 1 runtime scripts, prefabs and VRTesting scene are reused rather than replaced.
 
 ### Integrated Unity verification
 
-The installed Unity 6000.6.10f1 Editor compiled the updated game and ran a temporary
-Play Mode scenario with real BowController releases and Arrow physics collisions.
-All 42 checkpoints passed: fixed Practice lanes, single-target Competitive, blue-hit
-qualification, weak-hit/miss streak resets, earned 6/9/12 m progression, smooth movement,
-timer/shooting pause, waiting for another airborne arrow, cancel/restart isolation,
-last-arrow completion without another slide, timeout results and reticle state/draw feedback.
-A twelve-shot round produced 98 points, 11 hits, one miss and a win at the 12 m stage.
-No runtime errors or exceptions occurred during that scenario. Practice, Competitive,
-the moving target, expert range and results rendering were inspected after shader warmup.
-Repeating the presentation upgrade and scene validation also passed.
-Native mouse input started Practice and Competitive with the new overlay present;
-right-drag changed camera orientation and a real Space hold/release registered one shot.
-The temporary verification scripts were removed afterward.
+The installed Unity 6000.6.10f1 Editor compiled the single-target update and ran a
+temporary Play Mode scenario with real BowController releases and Arrow collisions.
+All 55 checks passed: exactly one target, no integrated left-hand Practice UI, slider
+movement at 6/8.5/12 m, draw/airborne locks, diagram coordinates matching lodged arrows,
+separate distance groups, revisiting an earlier distance, final airborne-shot completion,
+distance dropdown selection, retry isolation and zero-shot results at 7.3 m.
+Competitive still started at 6 m, earned 9 m after three gold hits, and showed its original
+results panel with 40 points from four shots and no Practice diagram.
+
+Practice and results rendering were inspected. Native mouse input changed the slider
+to 9.3 m and dragged the target from 12 m to 6.1 m. A second real-shot session recorded
+six distances; its results popup was opened, dragged to the later entries and selected
+12 m using native mouse input. The upgrade ran twice and scene validation passed.
+The integrated scenario reported no runtime errors or exceptions. Temporary verification
+scripts were removed afterward.
 This verifies the Editor preview, not physical headset tracking, controller-ray buttons,
 comfort, or device builds; those still need testing on the intended VR hardware.
 

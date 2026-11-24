@@ -6,9 +6,9 @@ namespace VirtualArchery
 {
     public class DifficultyManager : MonoBehaviour
     {
-        public Target[] targets = Array.Empty<Target>();
+        public Target target;
         public float[] distances = { 6f, 9f, 12f };
-        public GameObject practiceLanes;
+        public GameObject practiceDecor;
         public GameObject competitiveDecor;
 
         [Header("Precision progression")]
@@ -23,8 +23,8 @@ namespace VirtualArchery
         public bool IsTransitioning { get; private set; }
         public bool AdvancePending { get; private set; }
         public bool IsCompetitive { get; private set; }
-        public Target ActiveTarget => targets != null && targets.Length > 0
-            ? targets[targets.Length / 2] : null;
+        public float PracticeDistance { get; private set; } = 6f;
+        public Target ActiveTarget => target;
 
         readonly List<Arrow> embeddedArrows = new List<Arrow>();
         Target movingTarget;
@@ -43,48 +43,43 @@ namespace VirtualArchery
         public void SetPracticeLayout()
         {
             ResetLayout(false);
-            if (practiceLanes != null) practiceLanes.SetActive(true);
+            if (practiceDecor != null) practiceDecor.SetActive(true);
             if (competitiveDecor != null) competitiveDecor.SetActive(false);
-            if (targets != null)
+            Distance = PracticeDistance;
+            PositionTarget(PracticeDistance);
+            Changed?.Invoke();
+        }
+
+        public void SetPracticeDistance(float distance)
+        {
+            float selected = Mathf.Round(Mathf.Clamp(distance, 6f, 12f) * 10f) / 10f;
+            if (PracticeDistance == selected) return;
+            PracticeDistance = selected;
+            if (!IsCompetitive)
             {
-                for (int i = 0; i < targets.Length; i++)
-                {
-                    Target target = targets[i];
-                    if (target == null) continue;
-                    ClearEmbeddedArrows(target);
-                    Vector3 position = target.transform.position;
-                    position.x = (i - targets.Length / 2) * 2.2f;
-                    position.z = DistanceAt(i);
-                    target.transform.position = position;
-                    target.gameObject.SetActive(true);
-                }
+                Distance = selected;
+                PositionTarget(selected);
             }
             Changed?.Invoke();
+        }
+
+        void PositionTarget(float distance)
+        {
+            if (target == null) return;
+            ClearEmbeddedArrows(target);
+            Vector3 position = target.transform.position;
+            position.x = 0f;
+            position.z = distance;
+            target.transform.position = position;
+            target.gameObject.SetActive(true);
         }
 
         public void StartCompetitiveLayout()
         {
             ResetLayout(true);
-            if (practiceLanes != null) practiceLanes.SetActive(false);
+            if (practiceDecor != null) practiceDecor.SetActive(false);
             if (competitiveDecor != null) competitiveDecor.SetActive(true);
-            Target activeTarget = ActiveTarget;
-            if (targets != null)
-            {
-                foreach (Target target in targets)
-                {
-                    if (target == null) continue;
-                    ClearEmbeddedArrows(target);
-                    bool active = target == activeTarget;
-                    if (active)
-                    {
-                        Vector3 position = target.transform.position;
-                        position.x = 0f;
-                        position.z = Distance;
-                        target.transform.position = position;
-                    }
-                    target.gameObject.SetActive(active);
-                }
-            }
+            PositionTarget(Distance);
             Changed?.Invoke();
         }
 

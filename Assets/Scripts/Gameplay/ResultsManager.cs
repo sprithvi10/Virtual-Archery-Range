@@ -11,6 +11,7 @@ namespace VirtualArchery
         public int Misses { get; private set; }
         public int Points { get; private set; }
         public float Accuracy { get; private set; }
+        public PracticeShotSummary PracticeShots { get; private set; }
         public string Outcome => !IsCompetitive ? "Practice complete" :
             Won ? "Challenge won!" : "Challenge complete - goal not reached";
 
@@ -23,6 +24,7 @@ namespace VirtualArchery
             Misses = score.Misses;
             Points = score.Points;
             Accuracy = score.Accuracy;
+            PracticeShots = competitive ? null : score.PracticeShots;
         }
     }
 }

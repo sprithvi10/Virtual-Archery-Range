@@ -13,7 +13,7 @@ namespace VirtualArcheryEditor
     {
         const string AssetFolder = "Assets/Materials/Developer2/Woodland";
 
-        internal static GameObject Create(out GameObject practiceLanes, out GameObject competitiveDecor)
+        internal static GameObject Create(out GameObject practiceDecor, out GameObject competitiveDecor)
         {
             Directory.CreateDirectory(AssetFolder);
             AssetDatabase.Refresh();
@@ -88,17 +88,16 @@ namespace VirtualArcheryEditor
                 MeshObject(root, "Field Stone " + (i + 1), mound, new Vector3((i % 2 == 0 ? -1 : 1) * (6.8f + i * .55f), 0, 4 + i * 4),
                     new Vector3(1.1f + i * .12f, .5f + i % 2 * .25f, .85f), stone, i * 39);
 
-            practiceLanes = new GameObject("Practice Lanes");
-            practiceLanes.transform.SetParent(root, false);
-            for (int i = 0; i < 3; i++)
+            practiceDecor = new GameObject("Practice Distance Guide");
+            practiceDecor.transform.SetParent(root, false);
+            Box(practiceDecor.transform, "Central Practice Guide", new Vector3(0, .008f, 6.6f),
+                new Vector3(.035f, .016f, 10.8f), gold);
+            foreach (float distance in new[] { 6f, 12f })
             {
-                float x = (i - 1) * 2.2f;
-                float distance = 6 + i * 3;
-                Box(practiceLanes.transform, "Practice Lane " + (i + 1) + " Guide", new Vector3(x, .008f, (distance + 1.2f) * .5f),
-                    new Vector3(.035f, .016f, distance - 1.2f), gold);
-                Box(practiceLanes.transform, "Lane " + (i + 1) + " Distance Board", new Vector3(x, .31f, distance - .5f), new Vector3(1.12f, .48f, .06f), wood);
-                Sign(practiceLanes.transform, "Practice " + (i + 1) + " Label", "PRACTICE 0" + (i + 1) + "\n" + distance + " m",
-                    new Vector3(x, .32f, distance - .54f), new Vector2(1.06f, .43f), 34);
+                Box(practiceDecor.transform, "Practice Endpoint", new Vector3(0, .014f, distance),
+                    new Vector3(2.1f, .024f, .06f), gold);
+                Sign(practiceDecor.transform, "Practice Distance", distance + " m",
+                    new Vector3(-1.4f, .20f, distance), new Vector2(.55f, .3f), 38);
             }
 
             competitiveDecor = new GameObject("Competitive Course");

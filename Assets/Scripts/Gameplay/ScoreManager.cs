@@ -17,6 +17,7 @@ namespace VirtualArchery
         public int PendingShots => pending.Count;
         public float Accuracy => Hits + Misses == 0 ? 0f : 100f * Hits / (Hits + Misses);
         public int LastPoints { get; private set; }
+        public PracticeShotSummary PracticeShots { get; private set; }
 
         readonly HashSet<Arrow> pending = new HashSet<Arrow>();
         BowController subscribedBow;
@@ -52,7 +53,7 @@ namespace VirtualArchery
             subscribedBow = null;
         }
 
-        public void BeginSession()
+        public void BeginSession(Target practiceTarget)
         {
             if (!isActiveAndEnabled) return;
             SubscribeBow();
@@ -63,6 +64,7 @@ namespace VirtualArchery
             }
 
             pending.Clear();
+            PracticeShots = practiceTarget != null ? new PracticeShotSummary(practiceTarget) : null;
             Shots = 0;
             Hits = 0;
             Misses = 0;
@@ -87,6 +89,7 @@ namespace VirtualArchery
             IsTracking = false;
             isEnding = false;
             pending.Clear();
+            PracticeShots = null;
             if (bow != null) bow.SetShootingEnabled(false);
             Changed?.Invoke();
         }
@@ -107,6 +110,7 @@ namespace VirtualArchery
             Target target = result.Collider != null
                 ? result.Collider.GetComponentInParent<Target>() : null;
             int points = target != null ? target.CalculatePoints(result.Point) : 0;
+            PracticeShots?.Record(target, result.Point);
             LastPoints = points;
             Points += points;
             if (points > 0) Hits++;
